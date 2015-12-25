@@ -3685,8 +3685,7 @@ the beginning of the buffer."
    ("Col" 3 nil :right-align t)
    ("Level" 8 flycheck-error-list-entry-level-<)
    ("ID" 6 t)
-   ("Message" 0 t)
-   (" (Checker)" 8 t)]
+   ("Message (Checker)" 0 t)]
   "Table format for the error list.")
 
 (define-derived-mode flycheck-error-list-mode tabulated-list-mode "Flycheck errors"
@@ -3742,9 +3741,13 @@ the beginning of the buffer."
   (flycheck-error-list-goto-error (button-start button)))
 
 (defsubst flycheck-error-list-make-cell (text &optional face)
-  "Make an error list cell with TEXT and FACE."
-  (let ((face (or face 'default)))
-    (list text 'type 'flycheck-error-list 'face face)))
+  "Make an error list cell with TEXT and FACE.
+If FACE is nil, leave the face unspecified.  This works well if
+the text already has its own faces, but beware: if TEXT gets
+truncated when displayed and no FACE was specified, the
+truncation string will not inherit TEXT's own faces."
+  (append (list text 'type 'flycheck-error-list)
+          (and face (list 'face face))))
 
 (defsubst flycheck-error-list-make-number-cell (number face)
   "Make a table cell for a NUMBER with FACE.
@@ -3754,6 +3757,17 @@ string with attached text properties."
   (flycheck-error-list-make-cell
    (if (numberp number) (number-to-string number) "")
    face))
+
+(defun flycheck-error-list-make-last-column (message checker)
+  "Compute contents of the last error list cell.
+MESSAGE and CHECKER are displayed in a single column to allow the
+message to stretch arbitrarily far."
+  (let ((text (format "%s (%s)"
+                      (flycheck-flush-multiline-message message)
+                      (propertize (symbol-name checker)
+                                  'face 'flycheck-error-list-checker-name))))
+    (add-face-text-property 0 (length text) 'default t text)
+    text))
 
 (defun flycheck-error-list-make-entry (error)
   "Make a table cell for the given ERROR.
@@ -3778,10 +3792,7 @@ Return a list with the contents of the table cell."
                    (if id (format "%s" id) "")
                    'flycheck-error-list-id)
                   (flycheck-error-list-make-cell
-                   (flycheck-flush-multiline-message message))
-                  (flycheck-error-list-make-cell
-                   (format "(%s)" checker)
-                   'flycheck-error-list-checker-name)))))
+                   (flycheck-error-list-make-last-column message checker))))))
 
 (defun flycheck-compute-message-column-offset ()
   "Compute the amount of space to use in `flycheck-flush-multiline-message'."
